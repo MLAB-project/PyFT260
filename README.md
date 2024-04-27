@@ -9,6 +9,20 @@ Welcome to PyFT260, a Python driver and interface library designed to control an
 - **GPIO Control**: Manage GPIO pins directly through the FT260. **NOT YET IMPLEMENTED**
 - **Compatibility**: Designed as a drop-in replacement for smbus2, making it easy to switch and get the added benefits of FT260.
 
+## FTDI FT260
+
+The [FTDI FT260](https://www.ftdichip.com/old2020/Products/ICs/FT260.html) is a USB to UART/I2C bridge with an integrated Full Speed USB controller, built on the USB HID class specifically designed for bridging USB to UART and I2C interfaces. This chip simplifies USB to serial designs and significantly reduces external component count by fully integrating an internal USB 2.0 Hi-Speed IC and functionality for USB connectivity.
+
+### Key Features of FT260:
+- **USB 2.0 Full Speed compatible**
+- **Integrated clock circuit requiring no external crystal**
+- **Support for I2C and UART communication through USB**
+- **Programmable control over GPIO pins**
+- **Supports bus-powered and self-powered configurations**
+
+These features make the FT260 an good choice for developing USB interface applications where you requires booth. UART and I2C interface. 
+
+
 ## Installation
 
 You can install PyFT260 using pip:
