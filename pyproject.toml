@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ft260"
 description = " PyFT260: A Python driver and interface library for FTDI's FT260 I2C, UART, and GPIO functions "
-version = "0.1.2"
+version = "0.1.3"
 authors = [
   {name = "Roman Dvorak", email = "dvorakroman@ust.cz"}
 ]
