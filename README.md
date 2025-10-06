@@ -27,6 +27,6 @@ These features make the FT260 an good choice for developing USB interface applic
 
 You can install PyFT260 using pip:
 ```
-  pip3 install pyft260
+  pip3 install ft260
 ```
 
