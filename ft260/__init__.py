@@ -8,6 +8,18 @@ import logging
 
 __version__ = '0.1.0'
 
+# Module-level logger and debug control
+logger = logging.getLogger("pyft260")
+if not logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+    logger.addHandler(_h)
+logger.setLevel(logging.INFO)
+
+def set_debug(enabled: bool = True):
+    """Enable or disable verbose debug logging for the library."""
+    logger.setLevel(logging.DEBUG if enabled else logging.INFO)
+
 
 class FT260_I2C():
 
@@ -37,40 +49,57 @@ class FT260_I2C():
     This library was developed as part of MLAB project. Visit https://mlab.cz for more information.
     """
 
-    def __init__(self, hid_device=None, vid=None, pid=None, *args, **kwargs):
-        if hid_device is not None:
-            self.dev = hid_device
+    def __init__(self, hid_device=None, vid=None, pid=None, debug: bool = False):
+        self.driver_type = 'ft260_hid'
+        self.device = None
+        self.debug = bool(debug)
+        if self.debug:
+            logger.setLevel(logging.DEBUG)
 
-        ## TODO: S timhle si nejsem stoprocentne jisty, jak to nejlepe udelat. 
+        if hid_device is not None:
+            self.device = hid_device
+            logger.debug("Using provided HID device instance")
         elif vid is not None and pid is not None:
-            self.dev = hid.device()
-            self.dev.open(vid, pid)
+            self.device = hid.device()
+            self.device.open(vid, pid)
+            logger.debug(f"Opened HID device VID=0x{vid:04X}, PID=0x{pid:04X}")
         else:
             raise ValueError("Either hid_device or vid and pid must be provided.")
 
         self.initialize_ftdi()
-        self.driver_type = 'ft260_hid'
-        self.dev = hid_device
-        self.initialize_ftdi()
-
-        return True
 
 
     def initialize_ftdi(self):
-
         self.reset_i2c()
-        #self.set_i2c_speed(100000) # 100 Khz
-        self.get_i2c_status()
+        status = self.get_i2c_status()
+        logger.debug("Initial I2C status: %s", status)
+
+    def get_i2c_status(self):
+        """Query I2C engine status and current baudrate."""
+        d = self.device.get_feature_report(0xC0, 5)
+        bus = d[1]
+        status = {
+            "busy_chip":        (bus >> 0) & 1,
+            "error":            (bus >> 1) & 1,
+            "addr_nack":        (bus >> 2) & 1,
+            "data_nack":        (bus >> 3) & 1,
+            "arbitration_lost": (bus >> 4) & 1,
+            "idle":             (bus >> 5) & 1,
+            "busy_bus":         (bus >> 6) & 1,
+        }
+        status["baudrate"] = (d[2] | (d[3] << 8)) * 1000
+        return status
 
     
     def reset_i2c(self):
+        logger.debug("Sending I2C reset (feature 0xA1,0x20)")
         self.device.send_feature_report([0xA1, 0x20])
         
     def set_i2c_speed(self, speed = 100000):
         speed = int(speed/1000)
         LSB = (speed & 0xff)
         MSB = (speed>>8 & 0xff)
-        print(f"Set i2c rate to {speed} Hz: ", hex(LSB), hex(MSB))
+        logger.debug("Set I2C speed to %d kHz: LSB=%s MSB=%s", speed, hex(LSB), hex(MSB))
         self.device.send_feature_report([0xA1, 0x22, LSB, MSB])
 
 
@@ -272,35 +301,10 @@ class FT260_I2C():
 
         return data[2:data[1]+2]
 
-    def write_i2c_block_data(self, address, register, value):
-        """
-        I2C block transactions do not limit the number of bytes transferred
-        but the SMBus layer places a limit of 32 bytes.
-
-        I2C Block Write:  i2c_smbus_write_i2c_block_data()
-        ==================================================
-
-        The opposite of the Block Read command, this writes bytes to
-        a device, to a designated register that is specified through the
-        Comm byte. Note that command lengths of 0, 2, or more bytes are
-        supported as they are indistinguishable from data.
-
-        S Addr Wr [A] Comm [A] Data [A] Data [A] ... [A] Data [A] P
-
-        Functionality flag: I2C_FUNC_SMBUS_WRITE_I2C_BLOCK
-        """
-        
-        payload = [0xD0, address, 0x06, len(value) + 1, register] + value
-        self.device.write(payload)
+    # Removed duplicate/legacy variant to avoid API ambiguity; use write_block_data or write_i2c_block_data below
 
 
-    def read_i2c_block_data(self, address, register, length):
-        data = []
-        for i in range(length):
-            self.write_byte_data(address, register, i)
-            byte = self.read_byte(address)
-            data.append(byte)
-        return data
+    # Removed legacy per-byte loop variant; use the bulk read implementation below
         
     def read_i2c_block_data(self, address, register, length):
         """
@@ -329,6 +333,7 @@ class FT260_I2C():
 
         return d[2:d[1]]
 
+
     def write_i2c_block_data(self, address, register, data):
         """
         I2C Block Write: i2c_smbus_write_i2c_block_data()
@@ -352,10 +357,13 @@ class FT260_I2C():
     
 
 class FT260():
-    def __init__(self, VID=0, PID=0, *args, **kwargs):
+    def __init__(self, VID=0, PID=0, debug: bool = False):
         self.VID = VID
         self.PID = PID
         self.device = hid.device()
+        self.debug = bool(debug)
+        if self.debug:
+            logger.setLevel(logging.DEBUG)
         self.open_hid()
 
     def __str__(self) -> str:
@@ -385,16 +393,13 @@ class FT260():
         return status
 
     def FT260_I2C(self):
-        return I2C(self.device)
+        return FT260_I2C(hid_device=self.device, debug=self.debug)
 
     def FT260_UART(self):
         raise NotImplementedError("UART interface not implemented yet")
     
     def FT260_GPIO(self):
         raise NotImplementedError("GPIO interface not implemented yet")
-    
-
-
     
 
 
