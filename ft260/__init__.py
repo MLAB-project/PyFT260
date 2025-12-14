@@ -66,6 +66,9 @@ class FT260_I2C():
         else:
             raise ValueError("Either hid_device or vid and pid must be provided.")
 
+        #self.initialize_ftdi()
+        self.device.set_nonblocking(0)
+        self.driver_type = 'ft260_hid'
         self.initialize_ftdi()
 
 
@@ -73,6 +76,44 @@ class FT260_I2C():
         self.reset_i2c()
         status = self.get_i2c_status()
         logger.debug("Initial I2C status: %s", status)
+
+
+    def _select_report_id(self, length: int) -> int:
+        if length <= 4:
+            return 0xD0
+        report_ids = [0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB, 0xDC, 0xDD, 0xDE]
+        size = 8
+        for report in report_ids:
+            if length <= size:
+                return report
+            size += 4
+        raise ValueError("Payload too large for single HID report")
+
+
+    def _write_i2c(self, address: int, data: list[int], flag: int = 0x06):
+        report_id = self._select_report_id(len(data))
+        payload = [report_id, address, flag, len(data)] + data
+        self.device.write(payload)
+
+
+    def _read_i2c(self, address: int, length: int, flag: int = 0x06):
+        if length <= 0:
+            return []
+
+        length_bytes = length.to_bytes(2, byteorder='little')
+        self.device.write([0xC2, address, flag, length_bytes[0], length_bytes[1]])
+
+        data = []
+        while len(data) < length:
+            report = self.device.read(64)
+            if not report:
+                raise IOError("Timeout waiting for I2C response")
+
+            count = report[1]
+            data.extend(report[2:2 + count])
+
+        return data[:length]
+
 
     def get_i2c_status(self):
         """Query I2C engine status and current baudrate."""
@@ -281,7 +322,7 @@ class FT260_I2C():
 
         More detail documentation is at: https://www.kernel.org/doc/Documentation/i2c/i2c-protocol
         """
-        raise NotImplementedError
+        self._write_i2c(address, list(value))
 
     def read_i2c_block(self, address, length):
         """
@@ -320,18 +361,7 @@ class FT260_I2C():
         The method respects SMBus limitations of 32 bytes for block transactions.
         """
 
-        timeout = 500
-
-        register = (register).to_bytes(2, byteorder='little')
-        payload = [0xD4, address, 0x02, 2, register[0], register[1]]
-        self.device.write(payload)
-        length = (length).to_bytes(2, byteorder='little')
-        self.device.write([0xC2, address, 0x07, length[0], length[1]])
-        d = self.device.read(0xde, timeout)
-
-        print(d)
-
-        return d[2:d[1]]
+        return self._read_i2c(address, length)
 
 
     def write_i2c_block_data(self, address, register, data):
@@ -348,12 +378,8 @@ class FT260_I2C():
         Functionality flag: I2C_FUNC_SMBUS_WRITE_I2C_BLOCK
         """
 
-        register = (register).to_bytes(2, byteorder='little')
-        payload = [0xD4, address, 0x06, 0, register[0], register[1]] + data
-        payload[3] = len(payload) - 4
-        self.device.write(payload)
-
-        return True
+        payload = [register] + list(value)
+        self._write_i2c(address, payload)
     
 
 class FT260():
