@@ -5,8 +5,23 @@ import os
 import struct
 import logging
 
+# Keep runtime __version__ aligned with the installed package metadata.
+# If the package isn't installed (e.g. running from a source checkout), we
+# expose a sentinel value so the version is maintained in a single place
+# (`pyproject.toml`).
+try:
+    from importlib.metadata import PackageNotFoundError, version
+except Exception:  # pragma: no cover (py<3.8)
+    try:
+        from importlib_metadata import PackageNotFoundError, version  # type: ignore
+    except Exception:  # pragma: no cover
+        PackageNotFoundError = Exception  # type: ignore
+        version = None  # type: ignore
 
-__version__ = '0.1.0'
+try:
+    __version__ = version("ft260") if version is not None else "0+unknown"
+except PackageNotFoundError:
+    __version__ = "0+unknown"
 
 # Module-level logger and debug control
 logger = logging.getLogger("pyft260")
