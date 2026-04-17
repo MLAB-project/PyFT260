@@ -395,6 +395,30 @@ class FT260_I2C():
 
         payload = [register] + list(value)
         self._write_i2c(address, payload)
+
+    def i2c_rdwr(self, *msgs):
+        for i, msg in enumerate(msgs):
+            last = i == len(msgs) - 1
+            first = i == 0
+            if first and last:
+                flags = 0x06 # start+stop
+            elif first:
+                flags = 0x02 # start only
+            elif last:
+                flags = 0x07 # stop only
+            else:
+                flags = 0x03 # repeated start
+            if msg.flags & 0x0001: # read
+                response = self._read_i2c(msg.addr, msg.len, flags)
+                for i in range(msg.len):
+                    msg.buf[i] = response[i]
+            else:
+                buf = []
+                for i in range(msg.len):
+                    buf.append(msg.buf[i][0])
+                self._write_i2c(msg.addr, buf, flags)
+
+
     
 
 class FT260():
