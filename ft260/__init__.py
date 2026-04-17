@@ -132,7 +132,7 @@ class FT260_I2C():
 
     def get_i2c_status(self):
         """Query I2C engine status and current baudrate."""
-        d = self.device.get_feature_report(0xC0, 5)
+        d = self.device.get_feature_report(0xC0, 61)
         bus = d[1]
         status = {
             "busy_chip":        (bus >> 0) & 1,
