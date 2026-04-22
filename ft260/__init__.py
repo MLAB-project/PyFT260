@@ -376,6 +376,8 @@ class FT260_I2C():
         The method respects SMBus limitations of 32 bytes for block transactions.
         """
 
+        payload = [0xD0, address, 0x06, 1, register]
+        self.device.write(payload)
         return self._read_i2c(address, length)
 
 
@@ -393,7 +395,7 @@ class FT260_I2C():
         Functionality flag: I2C_FUNC_SMBUS_WRITE_I2C_BLOCK
         """
 
-        payload = [register] + list(value)
+        payload = [register] + list(data)
         self._write_i2c(address, payload)
 
     def i2c_rdwr(self, *msgs):
