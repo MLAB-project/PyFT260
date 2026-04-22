@@ -20,7 +20,7 @@ The [FTDI FT260](https://www.ftdichip.com/old2020/Products/ICs/FT260.html) is a 
 - **Programmable control over GPIO pins**
 - **Supports bus-powered and self-powered configurations**
 
-These features make the FT260 an good choice for developing USB interface applications where you requires booth. UART and I2C interface. 
+These features make the FT260 a good choice for developing USB interface applications where you requires booth. UART and I2C interface. 
 
 
 ## Installation
@@ -30,3 +30,7 @@ You can install PyFT260 using pip:
   pip3 install ft260
 ```
 
+Or development installation directly from the repository:
+```
+python -m pip install git+https://github.com/MLAB-project/PyFT260.git
+```
