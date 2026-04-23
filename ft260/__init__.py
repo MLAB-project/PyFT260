@@ -429,6 +429,7 @@ class FT260():
         self.PID = PID
         self.device = hid.device()
         self.debug = bool(debug)
+        self.interface_number = 0
         if self.debug:
             logger.setLevel(logging.DEBUG)
         self.open_hid()
@@ -441,10 +442,77 @@ class FT260():
         print(f'Product: {self.device.get_product_string()}')
         print(f'Serial Number: {self.device.get_serial_number_string()}')
 
+    @staticmethod
+    def _hid_info_get(info, key, default=None):
+        if isinstance(info, dict):
+            return info.get(key, default)
+        return getattr(info, key, default)
+
+    def _select_device_info(self, devices):
+        preferred = None
+        for info in devices:
+            if self._hid_info_get(info, 'interface_number', -1) == self.interface_number:
+                preferred = info
+                break
+        return preferred if preferred is not None else devices[0]
 
     def open_hid(self):
-        self.device.open(self.VID, self.PID)
-        self.device.set_nonblocking(0)
+        devices = []
+        open_error = None
+
+        for attempt in range(5):
+            devices = list(hid.enumerate(self.VID, self.PID))
+            if devices:
+                break
+            time.sleep(0.2)
+
+        if not devices:
+            raise OSError(f"FT260 not found (VID=0x{self.VID:04X}, PID=0x{self.PID:04X})")
+
+        chosen = self._select_device_info(devices)
+        chosen_path = self._hid_info_get(chosen, 'path')
+        chosen_interface = self._hid_info_get(chosen, 'interface_number', -1)
+
+        if chosen_path is not None and hasattr(self.device, 'open_path'):
+            for attempt in range(5):
+                try:
+                    self.device.open_path(chosen_path)
+                    self.device.set_nonblocking(0)
+                    logger.debug(
+                        "Opened HID device via path %r (interface=%s, VID=0x%04X, PID=0x%04X)",
+                        chosen_path,
+                        chosen_interface,
+                        self.VID,
+                        self.PID,
+                    )
+                    return
+                except Exception as exc:
+                    open_error = exc
+                    time.sleep(0.2)
+
+            raise OSError(
+                f"Could not open FT260 via HID path {chosen_path!r} "
+                f"(interface={chosen_interface}): {open_error}"
+            )
+
+        for attempt in range(5):
+            try:
+                self.device.open(self.VID, self.PID)
+                self.device.set_nonblocking(0)
+                logger.debug(
+                    "Opened HID device via VID/PID fallback (VID=0x%04X, PID=0x%04X)",
+                    self.VID,
+                    self.PID,
+                )
+                return
+            except Exception as exc:
+                open_error = exc
+                time.sleep(0.2)
+
+        raise OSError(
+            f"Could not open FT260 via HID VID/PID fallback "
+            f"(VID=0x{self.VID:04X}, PID=0x{self.PID:04X}): {open_error}"
+        )
 
 
     def get_i2c_status(self):
@@ -468,5 +536,4 @@ class FT260():
     def FT260_GPIO(self):
         raise NotImplementedError("GPIO interface not implemented yet")
     
-
 
