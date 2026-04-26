@@ -106,17 +106,20 @@ class FT260_I2C():
 
 
     def _write_i2c(self, address: int, data: list[int], flag: int = 0x06):
-        next_data = None
-        flag_mask = 0x00
-        if len(data) > 60: # Maximum length of single i2c write HID packet
-            flag_mask = 0x04 # clear stop bit
-            next_data = data[60:]
-            data = data[:60]
-        report_id = self._select_report_id(len(data))
-        payload = [report_id, address, flag & ~flag_mask, len(data)] + data
-        self.device.write(payload)
-        if next_data is not None:
-            self._write_i2c(address, next_data, flag & ~0x03) # no start/repeated start
+        while len(data) > 0:
+            if len(data) > 60: # Maximum length of single i2c write HID packet
+                this_data = data[:60]
+                this_flag = flag & ~0x04 # no stop, start bit only
+                data = data[60:]
+                flag = flag & 0x04 # no start, stop bit only
+            else:
+                this_data = data
+                this_flag = flag
+                data = []
+
+            report_id = self._select_report_id(len(this_data))
+            payload = [report_id, address, this_flag, len(this_data)] + this_data
+            self.device.write(payload)
 
 
     def _read_i2c(self, address: int, length: int, flag: int = 0x06):
