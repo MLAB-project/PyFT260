@@ -415,9 +415,7 @@ class FT260_I2C():
                 for i in range(msg.len):
                     msg.buf[i] = response[i]
             else:
-                buf = []
-                for i in range(msg.len):
-                    buf.append(msg.buf[i][0])
+                buf = list(msg)
                 self._write_i2c(msg.addr, buf, flags)
 
 
